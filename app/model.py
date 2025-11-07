@@ -1,8 +1,14 @@
+import pandas as pd
 from joblib import load
 from pathlib import Path
-from schemas import PatientData # Importação corrigida (sem ponto)
+from schemas import PatientData 
 
-MODEL_PATH = Path("/app/models/modelo_regressao_linear.joblib")
+# --- Caminho Corrigido ---
+CURRENT_FILE_PATH = Path(__file__).resolve()
+APP_DIR = CURRENT_FILE_PATH.parent
+PROJECT_ROOT = APP_DIR.parent
+MODEL_PATH = PROJECT_ROOT / "models" / "modelo_regressao_linear.joblib"
+# --- Fim da Correção de Caminho ---
 
 class Model:
     def __init__(self, model_path: Path):
@@ -16,37 +22,47 @@ class Model:
             print(f"AVISO: Modelo não encontrado em {model_path}. Usando um modelo de simulação.")
             self.model = None
 
-    # --- CORREÇÃO AQUI ---
-    # A função 'predict' deve estar indentada DENTRO da 'class Model'
     def predict(self, patient_data: PatientData) -> bool:
-        if not self.model:
-            # Lógica de simulação (com verificação de None)
-            if (
-                patient_data.glicemia_jejum_mg_dl is not None and patient_data.glicemia_jejum_mg_dl > 140
-            ) or (
-                patient_data.pressao_sistolica_mmHg is not None and patient_data.pressao_sistolica_mmHg > 140
-            ):
-                return True # Simula um outlier
-            return False # Simula um não-outlier
-
-        # --- LÓGICA DO MODELO REAL ---
-        # Mapeamento do schema de 22 features para as 5 que o modelo espera
-        input_data = [[
-            patient_data.idade,
-            patient_data.glicemia_jejum_mg_dl,
-            patient_data.pressao_sistolica_mmHg,
-            patient_data.pressao_diastolica_mmHg,
-            int(patient_data.historico_familiar_dc)
-        ]]
-
-        # Faça a predição
-        prediction = self.model.predict(input_data)
         
-        # Define um limiar
-        threshold = 0.5
-        is_outlier = bool(prediction[0] > threshold)
+        # --- CORREÇÃO TEMPORÁRIA (IGNORANDO O MODELO) ---
+        # O modelo .joblib está fazendo previsões erradas (ex: estável para IMC 58).
+        # Vamos forçar a lógica de simulação manual até que o modelo seja retreinado.
         
-        return is_outlier
+        print("FORÇADO: Usando lógica de simulação manual (regras de negócio).")
+        
+        # Regra 1: Glicemia
+        if (
+            patient_data.glicemia_jejum_mg_dl is not None and 
+            patient_data.glicemia_jejum_mg_dl > 140
+        ):
+            return True # Outlier
 
-# Cria uma instância única do modelo para ser usada pela API
+        # Regra 2: Pressão
+        if (
+            patient_data.pressao_sistolica_mmHg is not None and 
+            patient_data.pressao_sistolica_mmHg > 140
+        ):
+            return True # Outlier
+
+        # Regra 3: IMC (Obesidade severa)
+        if (
+            patient_data.imc is not None and 
+            patient_data.imc > 40
+        ):
+            return True # Outlier (IMC 58 do paciente se encaixa aqui)
+
+        # Se não caiu em nenhuma regra, é estável
+        return False
+        
+        # --- FIM DA CORREÇÃO TEMPORÁRIA ---
+        
+        
+        # --- O CÓDIGO DO MODELO REAL (IGNORADO POR ENQUANTO) ---
+        # patient_data_dict = patient_data.model_dump()
+        # input_df = pd.DataFrame([patient_data_dict])
+        # prediction = self.model.predict(input_df)
+        # is_outlier = bool(prediction[0] == 1) 
+        # return is_outlier
+
+# Cria uma instância única do modelo
 model_instance = Model(MODEL_PATH)
